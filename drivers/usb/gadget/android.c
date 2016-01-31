@@ -776,13 +776,10 @@ static int mass_storage_function_init(struct android_usb_function *f,
 
 	config->fsg.nluns = 1;
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	config->fsg.luns[0].cdrom = 1;
+	config->fsg.luns[0].cdrom = 0;
 	config->fsg.luns[0].ro = 0;
+	config->fsg.luns[0].nofua = 0;
 	config->fsg.luns[0].removable = 1;
-#else
-	config->fsg.luns[0].removable = 1;
-#endif
 
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
