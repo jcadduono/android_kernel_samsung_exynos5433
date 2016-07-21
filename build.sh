@@ -1,5 +1,5 @@
 #!/bin/bash
-# Samsung kernel for Samsung Exynos 5433 devices build script by jcadduono
+# TWRP kernel for Samsung Exynos 5433 devices build script by jcadduono
 
 ################### BEFORE STARTING ################
 #
@@ -47,7 +47,7 @@ export CROSS_COMPILE=$TOOLCHAIN/bin/arm-linux-gnueabihf-
 [ -x "${CROSS_COMPILE}gcc" ] ||
 ABORT "Unable to find gcc cross-compiler at location: ${CROSS_COMPILE}gcc"
 
-[ "$TARGET" ] || TARGET=samsung
+[ "$TARGET" ] || TARGET=twrp
 [ "$1" ] && DEVICE=$1
 [ "$2" ] && VARIANT=$2
 [ "$DEVICE" ] || DEVICE=trelte
