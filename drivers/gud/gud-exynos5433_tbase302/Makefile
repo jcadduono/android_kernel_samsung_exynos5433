@@ -4,7 +4,7 @@
 ##################################
 #mobicore_security_team_add
 ##################################
-GUD_ROOT_FOLDER := drivers/gud/gud-exynos5433_tbase302
+GUD_ROOT_FOLDER := $(srctree)/drivers/gud/gud-exynos5433_tbase302
 ##################################
 # add our modules to kernel.
 obj-$(CONFIG_MOBICORE_API) += mcKernelApi.o
@@ -34,9 +34,8 @@ ccflags-y += -DMC_NETLINK_COMPAT_V37
 ccflags-$(CONFIG_MOBICORE_DEBUG) += -DDEBUG
 ccflags-$(CONFIG_MOBICORE_VERBOSE) += -DDEBUG_VERBOSE
 
-# Choose one platform from the folder
-MOBICORE_PLATFORM := $(shell (ls -1 $(GUD_ROOT_FOLDER)/MobiCoreDriver/platforms | tail -1) )
-# Use the available platform folder
+MOBICORE_PLATFORM := EXYNOS_5433_STD
+
 ccflags-y += -I$(GUD_ROOT_FOLDER)/MobiCoreDriver/platforms/$(MOBICORE_PLATFORM)
 # MobiCore Driver includes
 ccflags-y += -I$(GUD_ROOT_FOLDER)/MobiCoreDriver/public

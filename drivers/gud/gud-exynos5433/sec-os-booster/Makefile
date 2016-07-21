@@ -4,11 +4,10 @@
 obj-$(CONFIG_SECURE_OS_BOOSTER_API) += sec_os_booster.o
 
 # MobiCore kernel driver path
-GUD_ROOT_FOLDER := drivers/gud/gud-exynos5433
+GUD_ROOT_FOLDER := $(srctree)/drivers/gud/gud-exynos5433
 
-# Choose one platform from the folder
-MOBICORE_PLATFORM := $(shell (ls -1 $(GUD_ROOT_FOLDER)/MobiCoreDriver/platforms | tail -1) )
-# Use the available platform folder
+MOBICORE_PLATFORM := EXYNOS_5433_STD
+
 ccflags-y += -I$(GUD_ROOT_FOLDER)/MobiCoreDriver/platforms/$(MOBICORE_PLATFORM)
 
 # Includes MobiCore kernel driver

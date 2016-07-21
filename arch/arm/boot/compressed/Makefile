@@ -107,6 +107,7 @@ $(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
 
 ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
 OBJS	+= $(libfdt_objs) atags_to_fdt.o
+CFLAGS_atags_to_fdt.o += -Wframe-larger-than=4096
 endif
 
 targets       := vmlinux vmlinux.lds \

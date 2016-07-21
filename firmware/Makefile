@@ -157,10 +157,10 @@ fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp_at.fw ssp_crashed_at.fw
 fw-shipped-$(CONFIG_SENSORS_MPU6500_BMI058_DUAL) += ssp_at_bmi.fw
 #for ice40
 fw-shipped-$(CONFIG_ICE40LM_FPGA) += ice40lm/k640.fw
-TSPFIRMWARE_DIRECTORY = firmware/tsp_synaptics
-ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY) && echo yes),yes)
-fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI) += tsp_synaptics/synaptics_b0_h.fw \
-	tsp_synaptics/synaptics_b0_fac.fw
+
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI) += \
+						tsp_synaptics/synaptics_b0_h.fw \
+						tsp_synaptics/synaptics_b0_fac.fw
 ifdef CONFIG_TOUCHSCREEN_CHAGALLVE
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_DSX) += \
 						tsp_synaptics/synaptics_s5710_chagallve.fw
@@ -170,37 +170,28 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_DSX) += \
 						tsp_synaptics/synaptics_s5707_klimtve.fw
 else
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_DSX) += \
-						tsp_synaptics/synaptics_s5100_a2_k.fw	\
-						tsp_synaptics/synaptics_s5100_a2_k_FHD.fw	\
-						tsp_synaptics/synaptics_s5100_a2_k_WQHD.fw	\
-						tsp_synaptics/synaptics_s5100_a3_kq_WQHD.fw	\
-						tsp_synaptics/synaptics_s5100_a3_l_WQHD.fw	\
-						tsp_synaptics/synaptics_s5100_a3_k_FHD.fw	\
+						tsp_synaptics/synaptics_s5100_a2_k.fw \
+						tsp_synaptics/synaptics_s5100_a2_k_FHD.fw \
+						tsp_synaptics/synaptics_s5100_a2_k_WQHD.fw \
+						tsp_synaptics/synaptics_s5100_a3_kq_WQHD.fw \
+						tsp_synaptics/synaptics_s5100_a3_l_WQHD.fw \
+						tsp_synaptics/synaptics_s5100_a3_k_FHD.fw \
 						tsp_synaptics/synaptics_5710_chagall.fw
 endif
 endif
-else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
-endif
-
-fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_DSX2) +=  \
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_DSX2) += \
 						tsp_synaptics/synaptics_5807_gts210.fw \
 						tsp_synaptics/synaptics_5807_gts28.fw \
 						tsp_synaptics/synaptics_5806_gts28.fw
 
-TSPFIRMWARE_DIRECTORY = firmware/tsp_stm
-ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY) && echo yes),yes)
 fw-shipped-$(CONFIG_TOUCHSCREEN_FTS) += \
-						tsp_stm/stm_s.fw	\
-						tsp_stm/stm_s_sync.fw	\
-						tsp_stm/stm_t.fw	\
-						tsp_stm/stm_tb.fw	\
-						tsp_stm/stm_tb_seper_1.fw	\
-						tsp_stm/stm_tb_seper_2.fw	\
+						tsp_stm/stm_s.fw \
+						tsp_stm/stm_s_sync.fw \
+						tsp_stm/stm_t.fw \
+						tsp_stm/stm_tb.fw \
+						tsp_stm/stm_tb_seper_1.fw \
+						tsp_stm/stm_tb_seper_2.fw \
 						tsp_stm/stm_tb_integ.fw
-else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
-endif
 
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 

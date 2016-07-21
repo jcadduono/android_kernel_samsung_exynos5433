@@ -575,6 +575,7 @@ int s5p_mfc_sleep(struct s5p_mfc_dev *dev)
 err_mfc_sleep:
 	s5p_mfc_clock_off(dev);
 
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 	/* release system pgtable */
 	if (dev->curr_ctx_drm) {
 		ret = s5p_mfc_release_sec_pgtable(dev);
@@ -582,7 +583,7 @@ err_mfc_sleep:
 			mfc_err("Fail to release MFC secure sysmmu page tables. ret = %d\n", ret);
 		}
 	}
-
+#endif
 
 	mfc_debug_leave();
 
@@ -605,6 +606,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
 	/* Set clock source again after wake up */
 	s5p_mfc_set_clock_parent(dev);
 
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 	/* setup system pgtable */
 	if (dev->curr_ctx_drm) {
 		ret = s5p_mfc_request_sec_pgtable(dev);
@@ -612,6 +614,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
 			mfc_err("Fail to make MFC secure sysmmu page tables. ret = %d\n", ret);
 		}
 	}
+#endif
 
 	/* 0. MFC reset */
 	mfc_debug(2, "MFC reset...\n");
