@@ -15,15 +15,24 @@ config CHARGING_VZWCONCEPT
 	 Say Y to include support for the VZW concepts.
 
 config BATTERY_SWELLING
-	bool "prevent battery swellin "
+	bool "prevent battery swelling"
 	help
 	  Say Y to include support for prevent battery swelling
 
 config BATTERY_SWELLING_SELF_DISCHARGING
 	bool "prevent battery swelling with self discharging"
-	depends on BATTERY_SWELLING
 	help
 	  Say Y to include support for prevent battery swelling with self discharging
+	  If you want to get debugging code for no chip, ask to VE GROUP.
+
+config BATTERY_SWELLING_SELF_DISCHARGING_GTS2_ONLY
+	bool "prevent battery swelling with self discharging only in gts2"
+	default n
+	depends on BATTERY_SWELLING_SELF_DISCHARGING
+	help
+	  Say Y to include supporting feature regarding preventing battery swelling. 
+	  It's only eligible for GTS2 projects, and it autonomously chooses the way of discharging
+	  between AP policy method and discharging IC one.
 
 config INBATTERY
 	bool "is inbattery or not"

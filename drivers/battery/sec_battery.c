@@ -13,6 +13,20 @@
 
 #include <linux/battery/sec_battery.h>
 
+/**************************************************************/
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING_GTS2_ONLY
+static int gts2_sdchg_ic_exist = 1;	// default : ic exist
+static int __init gts2_sdchg_ic_exist_setup(char *str)
+{
+	gts2_sdchg_ic_exist = simple_strtol(str, NULL, 0);
+	return 1;
+}
+
+__setup("gts2_sdchg_ic=", gts2_sdchg_ic_exist_setup);
+#endif
+#endif
+/**************************************************************/
 static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(batt_reset_soc),
 	SEC_BATTERY_ATTR(batt_read_raw_soc),
@@ -320,6 +334,31 @@ static int sec_bat_get_adc_value(
 	return adc;
 }
 
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+
+/* for discharging IC */
+int sec_bat_get_adc_value_using_sdchg(
+	struct sec_battery_info *battery, int channel)
+{
+	return sec_bat_get_adc_value(battery, channel);
+}
+EXPORT_SYMBOL(sec_bat_get_adc_value_using_sdchg);
+
+/* for S/W discharging */
+bool sdchg_charger_attached(struct sec_battery_info *battery)
+{
+	if (battery->wc_status || battery->ps_status)
+		return true;
+
+	if (battery->wire_status != POWER_SUPPLY_TYPE_BATTERY)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL(sdchg_charger_attached);
+
+#endif
+
 static int sec_bat_get_charger_type_adc
 				(struct sec_battery_info *battery)
 {
@@ -594,7 +633,7 @@ static bool sec_bat_battery_cable_check(struct sec_battery_info *battery)
 		}
 	}
 	return true;
-};
+}
 
 static int sec_bat_ovp_uvlo_by_psy(struct sec_battery_info *battery)
 {
@@ -1303,78 +1342,7 @@ static bool sec_bat_temperature_check(
 	}
 
 	return true;
-};
-
-#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-static void sec_bat_self_discharging_check(struct sec_battery_info *battery)
-{
-	int dis_adc;
-
-	dis_adc = sec_bat_get_adc_value(battery, SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK);
-	if (dis_adc < 0)
-		battery->self_discharging_adc = 0;
-	else
-		battery->self_discharging_adc = dis_adc;
-
-	if ((dis_adc >= (int)battery->pdata->discharging_adc_min) &&
-	    (dis_adc <= (int)battery->pdata->discharging_adc_max))
-		battery->self_discharging = true;
-	else
-		battery->self_discharging = false;
-
-	pr_info("%s : SELF_DISCHARGING(%d) SELF_DISCHARGING_ADC(%d)\n",
-		__func__, battery->self_discharging, battery->self_discharging_adc);
 }
-
-static void sec_bat_self_discharging_control(struct sec_battery_info *battery, bool dis_en)
-{
-	if (!battery->pdata->factory_discharging) {
-		pr_info("Can't control Self Discharging IC (No Factory Discharging Pin).\n");
-		return;
-	}
-
-	if (dis_en) {
-		dev_info(battery->dev,
-			 "%s : Self Discharging IC doesn't act until (%d) degree & (%d) voltage. "
-			 "Auto Discharging IC ENABLE\n", __func__,
-			 battery->temperature, battery->voltage_now);
-		gpio_direction_output(battery->pdata->factory_discharging, 1);
-		battery->force_discharging = true;
-	} else {
-		dev_info(battery->dev, "%s : Self Discharging IC disable.\n", __func__);
-		gpio_direction_output(battery->pdata->factory_discharging, 0);
-		battery->force_discharging = false;
-	}
-}
-
-static void sec_bat_discharging_check(struct sec_battery_info *battery)
-{
-	if (!battery->pdata->self_discharging_en)
-		return;
-
-	sec_bat_self_discharging_check(battery);
-
-	if(battery->factory_self_discharging_mode_on) {
-		dev_info(battery->dev,
-		 "%s: It is Factory mode by self discharging mode, Auto_DIS(%d), Force_DIS(%d)\n",
-		 __func__, battery->self_discharging, battery->force_discharging);
-		return;
-	}
-
-	if (!battery->self_discharging &&
-	    (battery->temperature >= battery->pdata->force_discharging_limit) &&
-	    (battery->voltage_now >= battery->pdata->self_discharging_voltage_limit)) {
-		sec_bat_self_discharging_control(battery, true);
-	} else if(battery->force_discharging &&
-		  ((battery->temperature <= battery->pdata->force_discharging_recov) ||
-		   (battery->voltage_now <= 4200))) {
-		sec_bat_self_discharging_control(battery, false);
-	}
-	dev_info(battery->dev,
-		 "%s: Auto_DIS(%d), Force_DIS(%d)\n",
-		 __func__, battery->self_discharging, battery->force_discharging);
-}
-#endif
 
 static int sec_bat_get_inbat_vol_by_adc(struct sec_battery_info *battery)
 {
@@ -2116,10 +2084,14 @@ static void sec_bat_get_battery_info(
 			pr_info("%s : forced full-charged sequence for the capacity(%d)\n",
 				__func__, battery->capacity);
 		}
-		/* update capacity max */
-		value.intval = battery->capacity;
-		psy_do_property(battery->pdata->fuelgauge_name, set,
-			POWER_SUPPLY_PROP_CHARGE_FULL, value);
+
+		if (value.intval >= battery->pdata->full_condition_soc &&
+			battery->voltage_now >= (battery->pdata->recharge_condition_vcell - 50)) {
+			/* update capacity max */
+			value.intval = battery->capacity;
+			psy_do_property(battery->pdata->fuelgauge_name, set,
+				POWER_SUPPLY_PROP_CHARGE_FULL, value);
+		}
 		old_ts = c_ts;
 	}
 #else
@@ -2228,8 +2200,13 @@ static unsigned int sec_bat_get_polling_time(
 	if (battery->polling_short)
 		return battery->pdata->polling_time[
 			SEC_BATTERY_POLLING_TIME_BASIC];
-	else
-		return battery->polling_time;
+
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+	if (battery->pdata->sdchg_info && battery->pdata->sdchg_info->nochip)
+		battery->polling_time = sdchg_get_polling_time(battery->polling_time);
+#endif
+
+	return battery->polling_time;
 }
 
 static bool sec_bat_is_short_polling(
@@ -2388,6 +2365,11 @@ static void sec_bat_monitor_work(
 
 				pr_info("Skip monitor work(%ld, Vnow:%dmV, Tbat:%d)\n",
 					c_ts.tv_sec - old_ts.tv_sec, battery->voltage_now, battery->temperature);
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+				if (battery->pdata->sdchg_info &&
+						battery->pdata->sdchg_info->nochip)
+					battery->pdata->sdchg_info->nochip->sdchg_monitor(battery, c_ts.tv_sec, true);
+#endif
 				goto skip_monitor;
 			}
 		}
@@ -2397,6 +2379,11 @@ static void sec_bat_monitor_work(
 	old_ts = c_ts;
 
 	sec_bat_get_battery_info(battery);
+
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+	if (battery->pdata->sdchg_info && battery->pdata->sdchg_info->nochip)
+		battery->pdata->sdchg_info->nochip->sdchg_monitor(battery, c_ts.tv_sec, false);
+#endif
 
 	/* 0. test mode */
 	if (battery->test_mode) {
@@ -2428,7 +2415,8 @@ static void sec_bat_monitor_work(
 		goto continue_monitor;
 
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-	sec_bat_discharging_check(battery);
+	if (battery->pdata->sdchg_info)
+		battery->pdata->sdchg_info->sdchg_discharging_check(battery);
 #endif
 
 #if defined(CONFIG_BATTERY_SWELLING)
@@ -3016,18 +3004,24 @@ ssize_t sec_bat_show_attrs(struct device *dev,
 		break;
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
 	case BATT_DISCHARGING_CHECK:
-		{
-			int ret;
-			ret = gpio_get_value(battery->pdata->factory_discharging);
-			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
-					   ret);
+	{
+		int ret;
+		if (battery->pdata->sdchg_info) {
+			ret = battery->pdata->sdchg_info->sdchg_force_check(battery);
+			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", ret);
+		} else {
+			pr_info("[SDCHG][%s] discharging info structure is null!!\n", __func__);
 		}
+	}
 		break;
 	case BATT_DISCHARGING_CHECK_ADC:
-		sec_bat_self_discharging_check(battery);
-		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
-				(battery->self_discharging_adc < battery->pdata->discharging_adc_min) ?
-				0 : battery->self_discharging_adc);
+		if (battery->pdata->sdchg_info) {
+			battery->pdata->sdchg_info->sdchg_adc_check(battery);
+			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
+				       battery->self_discharging_adc);
+		} else {
+			pr_info("[SDCHG][%s] discharging info structure is null!!\n", __func__);
+		}
 		break;
 	case BATT_SELF_DISCHARGING_CONTROL:
 		break;
@@ -3475,19 +3469,23 @@ ssize_t sec_bat_store_attrs(
 	case BATT_DISCHARGING_CHECK_ADC:
 		break;
 	case BATT_SELF_DISCHARGING_CONTROL:
-		if (sscanf(buf, "%d\n", &x) == 1) {
-			dev_err(battery->dev,
-				"%s: BATT_SELF_DISCHARGING_CONTROL(%d)\n", __func__, x);
-			if (x) {
-				battery->factory_self_discharging_mode_on = true;
-				pr_info("SELF DISCHARGING IC ENABLE\n");
-				sec_bat_self_discharging_control(battery, true);
-			} else {
-				battery->factory_self_discharging_mode_on = false;
-				pr_info("SELF DISCHARGING IC DISENABLE\n");
-				sec_bat_self_discharging_control(battery, false);
+		if (battery->pdata->sdchg_info) {
+			if (sscanf(buf, "%d\n", &x) == 1) {
+				dev_err(battery->dev,
+					"%s: BATT_SELF_DISCHARGING_CONTROL(%d)\n", __func__, x);
+				if (x) {
+					battery->factory_self_discharging_mode_on = true;
+					pr_info("SELF DISCHARGING IC ENABLE\n");
+					battery->pdata->sdchg_info->sdchg_force_control(battery, true);
+				} else {
+					battery->factory_self_discharging_mode_on = false;
+					pr_info("SELF DISCHARGING IC DISENABLE\n");
+					battery->pdata->sdchg_info->sdchg_force_control(battery, false);
+				}
+				ret = count;
 			}
-			ret = count;
+		} else {
+			pr_info("[SDCHG][%s] discharging info structure is null!!\n", __func__);
 		}
 		break;
 #endif
@@ -4080,6 +4078,7 @@ static int sec_bat_cable_check(struct sec_battery_info *battery,
 	case ATTACHED_DEV_CARDOCK_MUIC:
 	case ATTACHED_DEV_DESKDOCK_VB_MUIC:
 	case ATTACHED_DEV_SMARTDOCK_TA_MUIC:
+	case ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC:
 	case ATTACHED_DEV_AFC_CHARGER_5V_MUIC:
 	case ATTACHED_DEV_UNOFFICIAL_TA_MUIC:
 	case ATTACHED_DEV_UNOFFICIAL_ID_TA_MUIC:
@@ -4307,9 +4306,6 @@ static int sec_bat_parse_dt(struct device *dev,
 	int ret, len;
 	unsigned int i;
 	const u32 *p;
-#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-	u32 temp;
-#endif
 
 	if (!np) {
 		pr_info("%s: np NULL\n", __func__);
@@ -4778,43 +4774,39 @@ static int sec_bat_parse_dt(struct device *dev,
 	if (ret)
 		pr_info("%s : Charging reset time is Empty\n", __func__);
 
-#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-	pdata->factory_discharging = of_get_named_gpio(np, "battery,factory_discharging", 0);
-	if (pdata->factory_discharging < 0)
-		pdata->factory_discharging = 0;
-
-	pdata->self_discharging_en = of_property_read_bool(np,
-							   "battery,self_discharging_en");
-
-	ret = of_property_read_u32(np, "battery,force_discharging_limit",
-				   &temp);
-	pdata->force_discharging_limit = (int)temp;
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING_GTS2_ONLY
+	if (gts2_sdchg_ic_exist == 0)
+		pdata->sdchg_type = kstrdup("sdchg_ap", GFP_KERNEL);
+	else
+		pdata->sdchg_type = kstrdup("sdchg_ic", GFP_KERNEL);
+#else
+	ret = of_property_read_string(np,
+		"sdchg_type", (char const **)&pdata->sdchg_type);
 	if (ret)
-		pr_info("%s : Force Discharging limit is Empty", __func__);
-
-	ret = of_property_read_u32(np, "battery,force_discharging_recov",
-				   &temp);
-	pdata->force_discharging_recov = (int)temp;
-	if (ret)
-		pr_info("%s : Force Discharging recov is Empty", __func__);
-
-	pr_info("%s : FORCE_DISCHARGING_LIMT(%d), FORCE_DISCHARGING_RECOV(%d)\n",
-		__func__, pdata->force_discharging_limit, pdata->force_discharging_recov);
-
-	ret = of_property_read_u32(np, "battery,discharging_adc_min",
-				   (unsigned int *)&pdata->discharging_adc_min);
-	if (ret)
-		pr_info("%s : Discharging ADC Min is Empty", __func__);
-
-	ret = of_property_read_u32(np, "battery,discharging_adc_max",
-				   (unsigned int *)&pdata->discharging_adc_max);;
-	if (ret)
-		pr_info("%s : Discharging ADC Max is Empty", __func__);
-
-	ret = of_property_read_u32(np, "battery,self_discharging_voltage_limit",
-				   (unsigned int *)&pdata->self_discharging_voltage_limit);
-	if (ret)
-		pr_info("%s : Force Discharging recov is Empty", __func__);
+		pdata->sdchg_type = kstrdup("sdchg_ic", GFP_KERNEL);
+#endif
+	{
+		struct sdchg_info_t *pinfo;
+		// find info from list_head
+		list_for_each_entry(pinfo, &sdchg_info_head, info_list) {
+			if (!strcmp(pinfo->type, pdata->sdchg_type)) {
+				pdata->sdchg_info = pinfo;
+				if (pinfo->nochip)
+					sdchg_nochip_support = true;
+				pr_info("[SDCHG][%s] Battery Self Discharging Type : %s\n",
+					__func__, pdata->sdchg_type);
+				break;
+			}
+		}
+		if (!pinfo) {
+			pr_info("[SDCHG][%s] %s info is not found! \n" \
+				"!! Caution : This Model don't support Battery"\
+				" Swelling Self Discharging !!\n", __func__, pdata->sdchg_type);
+		} else {
+			pdata->sdchg_info->sdchg_parse_dt(dev);
+		}
+	}
 #endif
 
 #if defined(CONFIG_BATTERY_SWELLING)
@@ -5134,12 +5126,12 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 	battery->psy_ps.get_property = sec_ps_get_property;
 	battery->psy_ps.set_property = sec_ps_set_property;
 
-#if defined (CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-	if (battery->pdata->factory_discharging) {
-		ret = gpio_request(battery->pdata->factory_discharging, "FACTORY_DISCHARGING");
+#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
+	if (battery->pdata->sdchg_info) {
+		ret = battery->pdata->sdchg_info->sdchg_probe((void *)battery);
 		if (ret) {
-			pr_err("failed to request GPIO %u\n", battery->pdata->factory_discharging);
-			goto err_wake_lock;
+			pr_err("%s : Error! failed to sdchg_probe(%u)\n", __func__, ret);
+			goto err_sdchg_init;
 		}
 	}
 #endif
@@ -5316,8 +5308,9 @@ err_workqueue:
 	destroy_workqueue(battery->monitor_wqueue);
 err_wake_lock:
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
-	if (battery->pdata->factory_discharging && !ret)
-		gpio_free(battery->pdata->factory_discharging);
+	if (battery->pdata->sdchg_info)
+		battery->pdata->sdchg_info->sdchg_remove();
+err_sdchg_init:
 #endif
 	wake_lock_destroy(&battery->monitor_wake_lock);
 	wake_lock_destroy(&battery->cable_wake_lock);
@@ -5369,6 +5362,11 @@ static int __devexit sec_battery_remove(struct platform_device *pdev)
 	power_supply_unregister(&battery->psy_ac);
 	power_supply_unregister(&battery->psy_usb);
 	power_supply_unregister(&battery->psy_bat);
+
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+	if (battery->pdata->sdchg_info)
+		battery->pdata->sdchg_info->sdchg_remove();
+#endif
 
 	dev_dbg(battery->dev, "%s: End\n", __func__);
 	kfree(battery);
@@ -5456,8 +5454,10 @@ static void sec_battery_shutdown(struct device *dev)
 
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
 	if (battery->force_discharging) {
-		pr_info("SELF DISCHARGING IC DISENABLE\n");
-		sec_bat_self_discharging_control(battery, false);
+		if (battery->pdata->sdchg_info) {
+			pr_info("SELF DISCHARGING IC DISENABLE\n");
+			battery->pdata->sdchg_info->sdchg_force_control(battery, false);
+		}
 	}
 #endif
 

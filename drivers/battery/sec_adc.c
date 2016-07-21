@@ -54,6 +54,7 @@ static int sec_bat_adc_ap_read(int channel)
 		else
 			pr_debug("TEMP ADC(%d)\n", data);
 		break;
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
 	case SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK:
 		ret = iio_read_channel_raw(&temp_adc[2], &data);
 		if (ret < 0)
@@ -61,6 +62,7 @@ static int sec_bat_adc_ap_read(int channel)
 		else
 			pr_debug("DISCHARGING CHECK(%d)\n", data);
 		break;
+#endif
 	default:
 		break;
 	}
@@ -100,6 +102,16 @@ static void sec_bat_adc_ic_exit(void)
 static int adc_read_type(struct sec_battery_info *battery, int channel)
 {
 	int adc = 0;
+
+#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+	if (battery->pdata->sdchg_info && battery->pdata->sdchg_info->chip) {
+		if ((!battery->pdata->sdchg_info->chip->sdchg_en) &&
+			(channel == SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK)) {
+			pr_info("%s : Doesn't enable Self Discharging Algorithm\n", __func__);
+			return 0;
+		}		
+	}
+#endif
 
 	switch (battery->pdata->temp_adc_type)
 	{
