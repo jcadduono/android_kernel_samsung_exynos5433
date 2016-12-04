@@ -24,16 +24,4 @@ obj-$(CONFIG_CHARGER_MAX77888)	+= max77888_charger.o
 obj-$(CONFIG_CHARGER_MAX77849)  += max77849_charger.o
 obj-$(CONFIG_CHARGER_SM5703)	+= sm5703_charger.o
 obj-$(CONFIG_CHARGER_RT5033)    += rt5033_charger.o
-ifeq ($(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING),y)
-obj-y	+= sec_batt_selfdchg_common.o sec_batt_selfdchg_ic_use.o
-#obj-y	+= sec_batt_selfdchg_cs_use.o
-ifeq ($(CONFIG_MACH_UNIVERSAL7420),y)
-obj-y	+= sec_batt_selfdchg_exynos7420_ap_use.o
-endif
-ifeq ($(CONFIG_MACH_UNIVERSAL5433),y)
-obj-y	+= sec_batt_selfdchg_exynos5433_ap_use.o
-endif
-ifeq ($(CONFIG_MACH_UNIVERSAL3475),y)
-obj-y	+= sec_batt_selfdchg_exynos3475_ap_use.o
-endif
-endif
+

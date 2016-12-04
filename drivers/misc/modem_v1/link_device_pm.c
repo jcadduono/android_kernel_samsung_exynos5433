@@ -32,8 +32,6 @@ static unsigned long cp_hold_time = CP_HOLD_TIME;
 module_param(cp_hold_time, ulong, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(cp_hold_time, "modem_v1 pm cp_hold_time");
 
-struct workqueue_struct *holding_wq;
-
 static inline void print_pm_event(struct modem_link_pm *pm, enum pm_event event)
 {
 	int cp2ap_wakeup;
@@ -261,34 +259,15 @@ static inline void unmounted_to_resetting(struct modem_link_pm *pm)
 		      PM_EVENT_LINK_RESET, 500);
 }
 
-static inline void holding_work_func(struct work_struct *work)
-{
-	struct modem_link_pm *pm =
-		container_of(work, struct modem_link_pm, hold_w.work);
-
-	release_ap2cp_wakeup(pm);
-	msleep(5);
-	assert_ap2cp_wakeup(pm);
-
-	queue_delayed_work(holding_wq, &pm->hold_w, msecs_to_jiffies(1000));
-
-	mif_err("unmounted_to_holding retry\n");
-}
-
 static inline void unmounted_to_holding(struct modem_link_pm *pm)
 {
 	assert_ap2cp_wakeup(pm);
-	queue_delayed_work(holding_wq, &pm->hold_w, msecs_to_jiffies(1000));
-
 	start_pm_wdog(pm, PM_STATE_HOLDING, PM_STATE_RESETTING,
-	      PM_EVENT_CP2AP_WAKEUP_HIGH, 4000);
+		      PM_EVENT_CP2AP_WAKEUP_HIGH, 500);
 }
 
 static inline void holding_to_resetting(struct modem_link_pm *pm)
 {
-	if (work_pending(&pm->hold_w.work))
-		cancel_delayed_work(&pm->hold_w);
-
 	stop_pm_wdog(pm, PM_STATE_HOLDING, PM_EVENT_CP2AP_WAKEUP_HIGH);
 	reload_link(pm);
 	start_pm_wdog(pm, PM_STATE_RESETTING, PM_STATE_MOUNTING,
@@ -712,9 +691,6 @@ static void pm_wdog_bark(unsigned long data)
 	enum pm_state c_state;
 	unsigned long flags;
 
-	if (work_pending(&pm->hold_w.work))
-		cancel_delayed_work(&pm->hold_w);
-
 	spin_lock_irqsave(&pm->lock, flags);
 	c_state = fsm->state;
 	spin_unlock_irqrestore(&pm->lock, flags);
@@ -1013,14 +989,6 @@ int init_link_device_pm(struct link_device *ld,
 	INIT_DELAYED_WORK(&pm->cp_free_dwork, cp_free_work_func);
 
 	init_pm_fsm(pm);
-
-	holding_wq = create_singlethread_workqueue("holding_wq");
-	if (!holding_wq) {
-		mif_err("ERR! fail to create holding_wq\n");
-		return -EFAULT;
-	}
-
-	INIT_DELAYED_WORK(&pm->hold_w, holding_work_func);
 
 	/*
 	Register PM functions set by the common link PM framework and used by

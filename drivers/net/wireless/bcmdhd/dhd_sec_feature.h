@@ -1,7 +1,7 @@
 /*
  * Customer HW 4 dependant file
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -122,10 +122,6 @@
 #define READ_MACADDR
 #endif /* CONFIG_ARCH_MSM7X30 */
 
-#ifdef CONFIG_MACH_A7LTE
-#undef HW_OOB
-#endif /*CONFIG_MACH_A7LTE*/
-
 #if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_U1_NA_SPR) || \
 	defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_LT03EUR) || \
 	defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || \
@@ -205,6 +201,7 @@
 
 #if (CONFIG_WLAN_REGION_CODE == 202) /* KTT */
 #define VLAN_MODE_OFF
+#define CUSTOM_KEEP_ALIVE_SETTING	30000
 #define FULL_ROAMING_SCAN_PERIOD_60_SEC
 
 #ifdef CONFIG_MACH_UNIVERSAL5410

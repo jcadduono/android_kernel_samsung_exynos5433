@@ -59,10 +59,10 @@
 #include <linux/pinctrl/consumer.h>
 #include "../pinctrl/core.h"
 
-#include <linux/platform_data/spi-s3c64xx.h>
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
 #include <linux/wakelock.h>
 #include <linux/clk.h>
+#include <linux/platform_data/spi-s3c64xx.h>
 #include <linux/pm_runtime.h>
 #include <linux/spi/spidev.h>
 #include <linux/of.h>
@@ -73,10 +73,10 @@
 #if defined(CONFIG_SECURE_OS_BOOSTER_API)
 #include <mach/secos_booster.h>
 #endif
+#include <mach/bts.h>
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
 #include <mach/smc.h>
 #endif
-#include <linux/sysfs.h>
 
 struct sec_spi_info {
 	int		port;
@@ -89,8 +89,6 @@ static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_mutex);
 static struct class *vfsspi_device_class;
 static int gpio_irq;
-/* for irq enable, disable count */
-static int cnt_irq=0;
 
 #ifdef CONFIG_OF
 static struct of_device_id vfsspi_match_table[] = {
@@ -99,6 +97,17 @@ static struct of_device_id vfsspi_match_table[] = {
 };
 #else
 #define vfsspi_match_table NULL
+#endif
+
+/* using for awake the samsung FP daemon */
+bool fp_lockscreen_mode = false;
+/* input/Keyboard/gpio_keys.c */
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+#ifdef CONFIG_SENSORS_FP_LOCKSCREEN_MODE
+extern bool wakeup_by_key(void);
+/* export variable for signaling */
+EXPORT_SYMBOL(fp_lockscreen_mode);
+#endif
 #endif
 
 /*
@@ -148,7 +157,7 @@ struct vfsspi_device_data {
 	unsigned int ocp_en;
 	unsigned int ldo_pin; /* Ldo 3.3V GPIO pin number */
 	unsigned int ldo_pin2; /* Ldo 1.8V GPIO pin number */
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 	unsigned int vendor_pin; /* For checking vendor */
 #endif
 	struct work_struct work_debug;
@@ -171,11 +180,9 @@ struct vfsspi_device_data {
 	unsigned int orient;
 };
 
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 int FP_CHECK = 0; /* extern variable init */
 #endif
-
-bool fp_lockscreen_mode = false;
 
 #define VENDOR		"SYNAPTICS"
 #define CHIP_ID		"VIPER"
@@ -695,7 +702,6 @@ static int vfsspi_enableIrq(struct vfsspi_device_data *vfsspi_device)
 	vfsspi_pin_control(vfsspi_device, true);
 	enable_irq(gpio_irq);
 	atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_ENABLE);
-	cnt_irq++;
 	spin_unlock_irq(&vfsspi_device->irq_lock);
 	return 0;
 }
@@ -713,7 +719,6 @@ static int vfsspi_disableIrq(struct vfsspi_device_data *vfsspi_device)
 	disable_irq_nosync(gpio_irq);
 	atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_DISABLE);
 	vfsspi_pin_control(vfsspi_device, false);
-	cnt_irq--;
 	spin_unlock_irq(&vfsspi_device->irq_lock);
 	return 0;
 }
@@ -729,21 +734,16 @@ static irqreturn_t vfsspi_irq(int irq, void *context)
 	Therefore, we are checking DRDY GPIO pin state to make sure
 	if the interrupt handler has been called actually by DRDY
 	interrupt and it's not a previous interrupt re-play */
-	if (gpio_get_value(vfsspi_device->drdy_pin) == DRDY_ACTIVE_STATUS) {
+	if ((gpio_get_value(vfsspi_device->drdy_pin) == DRDY_ACTIVE_STATUS)
+		 && (atomic_read(&vfsspi_device->irq_enabled)
+		== DRDY_IRQ_ENABLE)) {
 		spin_lock(&vfsspi_device->irq_lock);
-		if (atomic_read(&vfsspi_device->irq_enabled) == DRDY_IRQ_ENABLE) {
-			disable_irq_nosync(gpio_irq);
-			atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_DISABLE);
-			vfsspi_pin_control(vfsspi_device, false);
-			cnt_irq--;
-			spin_unlock(&vfsspi_device->irq_lock);
-			vfsspi_send_drdy_signal(vfsspi_device);
-			pr_info("%s disableIrq\n", __func__);
-		}
-		else {
-			spin_unlock(&vfsspi_device->irq_lock);
-			pr_info("%s irq already diabled\n", __func__);
-		}
+		disable_irq_nosync(gpio_irq);
+		atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_DISABLE);
+		vfsspi_pin_control(vfsspi_device, false);
+		spin_unlock(&vfsspi_device->irq_lock);
+		vfsspi_send_drdy_signal(vfsspi_device);
+		pr_info("%s disableIrq\n", __func__);
 	}
 	return IRQ_HANDLED;
 }
@@ -921,10 +921,9 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 		break;
 
 	case VFSSPI_IOCTL_SET_SPI_CONFIGURATION:
-		pr_info("%s VFSSPI_IOCTL_SET_SPI_CONFIGURATION\n", __func__);
 		break;
+
 	case VFSSPI_IOCTL_RESET_SPI_CONFIGURATION:
-		pr_info("%s VFSSPI_IOCTL_RESET_SPI_CONFIGURATION\n", __func__);
 		break;
 	case VFSSPI_IOCTL_CPU_SPEEDUP:
 		if (copy_from_user(&onoff, (void *)arg,
@@ -1220,7 +1219,7 @@ static void vfsspi_platformUninit(struct vfsspi_device_data *vfsspi_device)
 			gpio_free(vfsspi_device->ldo_pin2);
 		gpio_free(vfsspi_device->sleep_pin);
 		gpio_free(vfsspi_device->drdy_pin);
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 		if (vfsspi_device->vendor_pin)
 			gpio_free(vfsspi_device->vendor_pin);
 #endif
@@ -1296,7 +1295,7 @@ static int vfsspi_parse_dt(struct device *dev,
 		}
 	}
 
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 	if (!of_find_property(np, "vfsspi-vendorPin", NULL)) {
 		pr_err("%s: not set vendorPin in dts\n", __func__);
 		data->vendor_pin = 0;
@@ -1406,14 +1405,23 @@ static void vfsspi_work_func_debug(struct work_struct *work)
 					| gpio_get_value(g_data->ldo_pin);
 	}
 
-	pr_info("%s ldo: %d,"
-		" sleep: %d, irq: %d, tz: %d, type: %s, cnt_irq: %d\n",
-		__func__,
-		ldo_value, gpio_get_value(g_data->sleep_pin),
-		gpio_get_value(g_data->drdy_pin),
-		g_data->tz_mode,
-		sensor_status[g_data->sensortype + 1],
-		cnt_irq);
+	if (g_data->ocp_en) {
+		pr_info("%s ocpen: %d, ldo: %d,"
+			" sleep: %d, irq: %d, tz: %d, type: %s\n",
+			__func__, gpio_get_value(g_data->ocp_en),
+			ldo_value, gpio_get_value(g_data->sleep_pin),
+			gpio_get_value(g_data->drdy_pin),
+			g_data->tz_mode,
+			sensor_status[g_data->sensortype + 1]);
+	} else {
+		pr_info("%s ldo: %d,"
+			" sleep: %d, irq: %d, tz: %d, type: %s\n",
+			__func__, ldo_value,
+			gpio_get_value(g_data->sleep_pin),
+			gpio_get_value(g_data->drdy_pin),
+			g_data->tz_mode,
+			sensor_status[g_data->sensortype + 1]);
+	}
 }
 
 static void vfsspi_enable_debug_timer(void)
@@ -1434,14 +1442,13 @@ static void vfsspi_timer_func(unsigned long ptr)
 	mod_timer(&g_data->dbg_timer,
 		round_jiffies_up(jiffies + FPSENSOR_DEBUG_TIMER_SEC));
 }
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 static int vfsspi_vendor_check(struct vfsspi_device_data *vfsspi_device)
 {
 	int status = 0;
 	pr_info("%s\n", __func__);
 
 	vfsspi_regulator_onoff(vfsspi_device, true); /* power on */
-	msleep(10);
 
 	status = gpio_request(vfsspi_device->vendor_pin, "vfsspi_vendor");
 	if (status < 0) {
@@ -1650,25 +1657,22 @@ static int vfsspi_probe(struct spi_device *spi)
 		pr_err("%s - Failed to platformInit\n", __func__);
 		goto vfsspi_probe_platformInit_failed;
 	}
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 	/* vendor check */
-	if (vfsspi_device->vendor_pin) {
-		status = vfsspi_vendor_check(vfsspi_device);
+	status = vfsspi_vendor_check(vfsspi_device);
 
-		if (status) { /* normal = 0, not viper = 1 */
-			if (status) {
-				pr_info("%s: It is not viper sensor.\n", __func__);
-				status = -ENODEV;
-				goto vfsspi_vendor_check_failed;
-			} else if (status < 0) {
-				pr_info("%s: vendor gpio request failed.\n", __func__);
-				goto vfsspi_vendor_request_failed;
-			}
-		} else {
-			FP_CHECK = 1; /* It is viper sensor */
+	if (status) { /* normal = 0, not viper = 1 */
+		if (status) {
+			pr_info("%s: It is not viper sensor.\n", __func__);
+			status = -ENODEV;
+			goto vfsspi_vendor_check_failed;
+		} else if (status < 0) {
+			pr_info("%s: vendor gpio request failed.\n", __func__);
+			goto vfsspi_vendor_request_failed;
 		}
-	} else
-		pr_info("%s: This model has no vender pin dts.\n", __func__);
+	} else {
+		FP_CHECK = 1; /* It is viper sensor */
+	}
 #endif
 	spi->bits_per_word = BITS_PER_WORD;
 	spi->max_speed_hz = SLOW_BAUD_RATE;
@@ -1776,12 +1780,12 @@ vfsspi_probe_alloc_chardev_failed:
 #ifndef ENABLE_SENSORS_FPRINT_SECURE
 vfsspi_probe_spi_setup_failed:
 #endif
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 vfsspi_vendor_check_failed:
 	pinctrl_put(vfsspi_device->p);
 #endif
 	vfsspi_platformUninit(vfsspi_device);
-#ifdef CONFIG_SENSORS_FINGERPRINT_DUALIZATION
+#ifdef ENABLE_VENDOR_CHECK
 vfsspi_vendor_request_failed:
 #endif
 vfsspi_probe_platformInit_failed:

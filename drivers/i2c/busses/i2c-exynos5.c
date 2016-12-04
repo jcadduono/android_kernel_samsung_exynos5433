@@ -1014,11 +1014,7 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
 	i2c->bus_id = of_alias_get_id(i2c->adap.dev.of_node, "hsi2c");
 
 	exynos5_i2c_init(i2c);
-	
 
-#ifdef CONFIG_FIX_I2C_BUS_NUM
-	if (of_property_read_u32(np, "samsung,i2c-bus-num", &i2c->adap.nr))
-#endif
 	i2c->adap.nr = -1;
 	ret = i2c_add_numbered_adapter(&i2c->adap);
 	if (ret < 0) {

@@ -209,8 +209,6 @@ struct modem_link_pm {
 	Linux notifier lists
 	*/
 	struct raw_notifier_head unmount_notifier_list;
-
-	struct delayed_work hold_w;
 };
 
 #define wdog_to_pm(wdog)	container_of(wdog, struct modem_link_pm, wdog)

@@ -129,7 +129,6 @@ struct idmac_desc {
 #define DW_MCI_BUSY_WAIT_TIMEOUT	250
 
 static struct dma_attrs dw_mci_direct_attrs;
-uint32_t mmc0_reg, mmc2_reg;
 
 #if defined(CONFIG_MMC_DW_DEBUG)
 static struct dw_mci_debug_data dw_mci_debug __cacheline_aligned;
@@ -3723,12 +3722,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	} else {
 		ctrl_id = to_platform_device(host->dev)->id;
 	}
-
-	if (ctrl_id == 0)
-		mmc0_reg = (uint32_t)host->regs;
-	else if (ctrl_id == 2)
-		mmc2_reg = (uint32_t)host->regs;
-
 	if (drv_data && drv_data->caps)
 		mmc->caps |= drv_data->caps[ctrl_id];
 

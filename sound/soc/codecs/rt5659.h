@@ -1770,8 +1770,8 @@ struct rt5659_cal_data {
 	unsigned short mono_cal[0xd];
 };
 
-#define CODEC_EFS_CLASS_NAME	"codec"
-#define CODEC_EFS_DEV_NAME		"cal"
+#define CODEC_EFS_CLASS_NAME	"audio"
+#define CODEC_EFS_DEV_NAME		"codec"
 #define CAL_DATA_EFS			"/efs/.rt5659_cal.dat"
 #define EFS_CAL_BUF_SIZE		200
 
@@ -1818,6 +1818,5 @@ int rt5659_get_jack_type(struct snd_soc_codec *codec, unsigned long action);
 #ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL_RT5659
 void rt5659_dynamic_control_micbias(int micb_out_val);
 #endif
-void rt5659_micbias1_output(int on);
 
 #endif /* __RT5659_H__ */

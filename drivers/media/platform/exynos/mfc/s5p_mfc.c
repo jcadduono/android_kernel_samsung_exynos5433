@@ -534,13 +534,11 @@ static int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev)
 #elif defined(CONFIG_SOC_EXYNOS5433)
 static int mfc_check_power_state(struct s5p_mfc_dev *dev)
 {
-	int reg_val, ref_val, state_val;
+	int reg_val, ref_val;
 
 	ref_val = s5p_mfc_get_power_ref_cnt(dev);
 	reg_val = readl(EXYNOS5433_MFC_CONFIGURATION);
-	state_val = readl(EXYNOS5433_MFC_STATUS);
-	mfc_err("* MFC power config = 0x%x, state = 0x%x, ref cnt = %d\n",
-			reg_val, state_val, ref_val);
+	mfc_err("* MFC power state = 0x%x, ref cnt = %d\n", reg_val, ref_val);
 
 	if (reg_val)
 		return 1;
@@ -587,7 +585,7 @@ static int mfc_check_clock_state(struct s5p_mfc_dev *dev)
 
 	return 0;
 }
-int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev)
+static int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev)
 {
 	int ret;
 

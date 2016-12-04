@@ -196,12 +196,8 @@ static long sdcardfs_propagate_lookup(struct super_block *sb, char* pathname) {
 	const struct cred *saved_cred = NULL;
 
 	sbi = SDCARDFS_SB(sb);
-	OVERRIDE_ROOT_CRED(saved_cred);
 	propagate_path = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (!propagate_path) {
-		REVERT_CRED(saved_cred);
-		return -ENOMEM;
-	}
+	OVERRIDE_ROOT_CRED(saved_cred);
 	if (sbi->options.type != TYPE_NONE && sbi->options.type != TYPE_DEFAULT) {
 		snprintf(propagate_path, PATH_MAX, "/mnt/runtime/default/%s%s",
 				sbi->options.label, pathname);

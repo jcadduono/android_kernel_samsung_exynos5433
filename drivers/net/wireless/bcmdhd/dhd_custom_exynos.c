@@ -1,7 +1,7 @@
 /*
  * Platform Dependent file for Samsung Exynos
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -66,12 +66,10 @@
 #define WLAN_STATIC_SCAN_BUF1		6
 #define WLAN_STATIC_DHD_INFO_BUF	7
 #define WLAN_STATIC_DHD_WLFC_INFO	8
-#define WLAN_STATIC_DHD_WLFC_HANGER	9
-#define WLAN_STATIC_DHD_LOG_DUMP_BUF	10
+#define WLAN_STATIC_DHD_LOG_DUMP_BUF	9
 #define WLAN_SCAN_BUF_SIZE		(64 * 1024)
 #define WLAN_DHD_INFO_BUF_SIZE			(24 * 1024)
 #define WLAN_STATIC_DHD_WLFC_INFO_SIZE		(64 * 1024)
-#define WLAN_STATIC_DHD_WLFC_HANGER_SIZE	(64 * 1024)
 
 #define PREALLOC_WLAN_SEC_NUM		4
 #define PREALLOC_WLAN_BUF_NUM		160
@@ -113,7 +111,6 @@ void *wlan_static_scan_buf0 = NULL;
 void *wlan_static_scan_buf1 = NULL;
 void *wlan_static_dhd_info_buf = NULL;
 void *wlan_static_dhd_wlfc_buf = NULL;
-void *wlan_static_dhd_wlfc_hanger_buf = NULL;
 void *wlan_static_dhd_log_dump_buf = NULL;
 
 static void *dhd_wlan_mem_prealloc(int section, unsigned long size)
@@ -145,16 +142,6 @@ static void *dhd_wlan_mem_prealloc(int section, unsigned long size)
 			return NULL;
 		}
 		return wlan_static_dhd_wlfc_buf;
-	}
-
-	if (section == WLAN_STATIC_DHD_WLFC_HANGER)  {
-		if (size > WLAN_STATIC_DHD_WLFC_HANGER_SIZE) {
-			pr_err("request DHD_WLFC_HANGER size(%lu) is bigger than"
-				" static size(%d).\n",
-				size, WLAN_STATIC_DHD_WLFC_HANGER_SIZE);
-			return NULL;
-		}
-		return wlan_static_dhd_wlfc_hanger_buf;
 	}
 
 	if (section == WLAN_STATIC_DHD_LOG_DUMP_BUF) {
@@ -218,11 +205,6 @@ static int dhd_init_wlan_mem(void)
 
 	wlan_static_dhd_wlfc_buf = kmalloc(WLAN_STATIC_DHD_WLFC_INFO_SIZE, GFP_KERNEL);
 	if (!wlan_static_dhd_wlfc_buf) {
-		goto err_mem_alloc;
-	}
-
-	wlan_static_dhd_wlfc_hanger_buf = kmalloc(WLAN_STATIC_DHD_WLFC_HANGER_SIZE, GFP_KERNEL);
-	if (!wlan_static_dhd_wlfc_hanger_buf) {
 		goto err_mem_alloc;
 	}
 

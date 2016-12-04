@@ -1,7 +1,7 @@
 /*
  * DHD PROP_TXSTATUS Module.
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -168,7 +168,7 @@ exit:
 	hang-er: noun, a contrivance on which things are hung, as a hook.
 */
 static void*
-_dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
+_dhd_wlfc_hanger_create(osl_t *osh, int max_items)
 {
 	int i;
 	wlfc_hanger_t* hanger;
@@ -176,8 +176,7 @@ _dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
 	/* allow only up to a specific size for now */
 	ASSERT(max_items == WLFC_HANGER_MAXITEMS);
 
-	if ((hanger = (wlfc_hanger_t*)DHD_OS_PREALLOC(dhd, DHD_PREALLOC_DHD_WLFC_HANGER,
-			WLFC_HANGER_SIZE(max_items))) == NULL)
+	if ((hanger = (wlfc_hanger_t*)MALLOC(osh, WLFC_HANGER_SIZE(max_items))) == NULL)
 		return NULL;
 
 	memset(hanger, 0, WLFC_HANGER_SIZE(max_items));
@@ -190,13 +189,12 @@ _dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
 }
 
 static int
-_dhd_wlfc_hanger_delete(dhd_pub_t *dhd, void* hanger)
+_dhd_wlfc_hanger_delete(osl_t *osh, void* hanger)
 {
 	wlfc_hanger_t* h = (wlfc_hanger_t*)hanger;
 
 	if (h) {
-		DHD_OS_PREFREE(dhd, DHD_PREALLOC_DHD_WLFC_HANGER,
-				h, WLFC_HANGER_SIZE(h->max_items));
+		MFREE(osh, h, WLFC_HANGER_SIZE(h->max_items));
 		return BCME_OK;
 	}
 	return BCME_BADARG;
@@ -2614,7 +2612,7 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 	wlfc->dhdp = dhd;
 
 	if (!WLFC_GET_AFQ(dhd->wlfc_mode)) {
-		wlfc->hanger = _dhd_wlfc_hanger_create(dhd, WLFC_HANGER_MAXITEMS);
+		wlfc->hanger = _dhd_wlfc_hanger_create(dhd->osh, WLFC_HANGER_MAXITEMS);
 		if (wlfc->hanger == NULL) {
 			DHD_OS_PREFREE(dhd, DHD_PREALLOC_DHD_WLFC_INFO,
 				dhd->wlfc_state, sizeof(athost_wl_status_info_t));
@@ -3426,7 +3424,7 @@ dhd_wlfc_deinit(dhd_pub_t *dhd)
 
 	if (!WLFC_GET_AFQ(dhd->wlfc_mode)) {
 		/* delete hanger */
-		_dhd_wlfc_hanger_delete(dhd, wlfc->hanger);
+		_dhd_wlfc_hanger_delete(dhd->osh, wlfc->hanger);
 	}
 
 

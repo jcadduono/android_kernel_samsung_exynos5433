@@ -1,7 +1,7 @@
 /*
  * Customer HW 4 dependant file
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -228,7 +228,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"IE", "IE", 5},
 	{"IL", "IL", 14},
 	{"IT", "IT", 4},
-	{"JP", "JP", 968},
+	{"JP", "JP", 45},
 	{"JO", "JO", 3},
 	{"KE", "SA", 0},
 	{"KW", "KW", 5},
@@ -292,8 +292,8 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"EC", "EC", 21},
 	{"SV", "SV", 25},
 	{"KR", "KR", 70},
-	{"RU", "RU", 988},
-	{"UA", "UA", 16},
+	{"RU", "RU", 13},
+	{"UA", "UA", 8},
 	{"GT", "GT", 1},
 	{"MN", "MN", 1},
 	{"NI", "NI", 2},

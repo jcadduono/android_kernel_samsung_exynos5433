@@ -201,36 +201,6 @@
 		battery,swelling_high_rechg_voltage = <4150>;
 		battery,swelling_low_rechg_voltage = <4050>;
 		battery,swelling_block_time = <600>;
-
-		/***********************************************************/
-		/* VE_SW for Battery Self Discharging(to prevent swelling) */
-		/* Enable TYPE : sdchg_ic, sdchg_ap, sdchg_cs, sdchg_ldo, ... */
-		/* The following line, "sdchg_type", is annotaed to support the dualization for Zero and GTS2 project.
-		     In case of other projects, "sdchg_type" should be designated to decide the way of self-discharging.
-		     In general cases, the default type is "sdchg_ic",which means self-discharging IC on PCB,
-		     unless "sdchg_type" is not designated.*/
-		/*
-		sdchg_type = "sdchg_ap";
-		*/
-		sdchg_ap {
-			compatible = "samsung,sdchg_ap";
-			sdchg,temperature_start = <600>;
-			sdchg,temperature_end = <550>;
-			sdchg,soc_start = <96>;
-			sdchg,soc_end = <92>;
-			sdchg,voltage_start = <4250>;	/* 4250 - 0(Volt. Comp. factor) = 4250 */
-			/* sdchg,voltage_end = <4200>;	-> from  battery,swelling_drop_float_voltage */
-		};
-		sdchg_cs {
-			compatible = "samsung,sdchg_cs";
-			sdchg,temperature_start = <600>;
-			sdchg,temperature_end = <550>;
-			sdchg,soc_start = <96>;
-			sdchg,soc_end = <92>;
-			sdchg,voltage_start = <4250>;	/* 4250 - 0(Volt. Comp. factor) = 4250 */
-			/* sdchg,voltage_end = <4200>;	-> from battery,swelling_drop_float_voltage */
-		};
-		/***********************************************************/
 	};
 
 	hsi2c@14D90000 {

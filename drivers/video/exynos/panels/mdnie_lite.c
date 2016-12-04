@@ -114,6 +114,7 @@ static void mdnie_update_sequence(struct mdnie_info *mdnie, struct mdnie_table *
 		mdnie_request_table(mdnie->path, table);
 
 	mdnie_write_table(mdnie, table);
+	return;
 }
 
 static void mdnie_update(struct mdnie_info *mdnie)
@@ -135,6 +136,8 @@ static void mdnie_update(struct mdnie_info *mdnie)
 		mdnie->white_g = table->seq[scr_info->index].cmd[scr_info->white_g];
 		mdnie->white_b = table->seq[scr_info->index].cmd[scr_info->white_b];
 	}
+
+	return;
 }
 
 static void update_color_position(struct mdnie_info *mdnie, unsigned int idx)
@@ -177,7 +180,7 @@ static int get_panel_coordinate(struct mdnie_info *mdnie, int *result)
 	}
 
 	ret = sscanf(fp, "%d, %d", &x, &y);
-	if ((ret != 2) || !(x || y)) {
+	if ((ret != 2) || (!x && !y)) {
 		dev_info(mdnie->dev, "%s: %d, %d\n", __func__, x, y);
 		ret = -EINVAL;
 		goto skip_color_correction;
@@ -215,7 +218,7 @@ static ssize_t mode_store(struct device *dev,
 	int ret;
 	int result[5] = {0,};
 
-	ret = kstrtouint(buf, 0, &value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
 	if (ret < 0)
 		return ret;
 
@@ -257,7 +260,7 @@ static ssize_t scenario_store(struct device *dev,
 	unsigned int value;
 	int ret;
 
-	ret = kstrtouint(buf, 0, &value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
 	if (ret < 0)
 		return ret;
 
@@ -318,7 +321,7 @@ static ssize_t tuning_store(struct device *dev,
 	int ret;
 
 	if (sysfs_streq(buf, "0") || sysfs_streq(buf, "1")) {
-		ret = kstrtouint(buf, 0, &mdnie->tuning);
+		ret = kstrtoul(buf, 0, (unsigned long *)&mdnie->tuning);
 		if (ret < 0)
 			return ret;
 		if (!mdnie->tuning)
@@ -365,7 +368,7 @@ static ssize_t accessibility_store(struct device *dev,
 		&value, &s[0], &s[1], &s[2], &s[3],
 		&s[4], &s[5], &s[6], &s[7], &s[8]);
 
-	dev_info(dev, "%s: value=%d, %d\n", __func__, value, ret);
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	if (ret < 0)
 		return ret;
@@ -376,12 +379,12 @@ static ssize_t accessibility_store(struct device *dev,
 		mutex_lock(&mdnie->lock);
 		mdnie->accessibility = value;
 		if (value == COLOR_BLIND) {
-			if (ret > ARRAY_SIZE(s) + 1) {
+			if (ret != 10) {
 				mutex_unlock(&mdnie->lock);
 				return -EINVAL;
 			}
-			wbuf = &mdnie->tune->accessibility_table[value].seq[scr_info->index].cmd[scr_info->color_blind];
-			while (i < ret - 1) {
+			wbuf = &mdnie->tune->accessibility_table[COLOR_BLIND].seq[scr_info->index].cmd[scr_info->color_blind];
+			while (i < ARRAY_SIZE(s)) {
 				wbuf[i * 2 + 0] = GET_LSB_8BIT(s[i]);
 				wbuf[i * 2 + 1] = GET_MSB_8BIT(s[i]);
 				i++;
@@ -432,7 +435,7 @@ static ssize_t bypass_store(struct device *dev,
 	unsigned int value;
 	int ret;
 
-	ret = kstrtouint(buf, 0, &value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
 
 	dev_info(dev, "%s :: value=%d\n", __func__, value);
 
@@ -474,7 +477,7 @@ static ssize_t auto_brightness_store(struct device *dev,
 	int ret;
 	static unsigned int update;
 
-	ret = kstrtouint(buf, 0, &value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
 	if (ret < 0)
 		return ret;
 
@@ -549,8 +552,8 @@ static ssize_t sensorRGB_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%d %d %d\n", mdnie->white_r, mdnie->white_g, mdnie->white_b);
+	return sprintf(buf, "%d %d %d\n", mdnie->white_r,
+		mdnie->white_g, mdnie->white_b);
 }
 
 static ssize_t sensorRGB_store(struct device *dev,
@@ -617,7 +620,7 @@ static ssize_t hmtColorTemp_store(struct device *dev,
 	unsigned int value;
 	int ret;
 
-	ret = kstrtouint(buf, 0, &value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
 	if (ret < 0)
 		return ret;
 
@@ -707,7 +710,6 @@ int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r, struct md
 			ret = -EINVAL;
 			goto error0;
 		}
-
 		mdnie_class->dev_attrs = mdnie_attributes;
 	}
 
@@ -759,111 +761,5 @@ error1:
 	class_destroy(mdnie_class);
 error0:
 	return ret;
-}
-
-
-static int attr_store(struct device *dev,
-	struct attribute *attr, const char *buf, size_t size)
-{
-	struct device_attribute *dev_attr = container_of(attr, struct device_attribute, attr);
-
-	dev_err(dev, "%s: %s\n", __func__, attr->name);
-
-	dev_attr->store(dev, dev_attr, buf, size);
-
-	return 0;
-}
-
-static int attrs_store_iter(struct device *dev,
-	const char *name, const char *buf, size_t size, struct attribute **attrs)
-{
-	int i;
-
-	for (i = 0; attrs[i]; i++) {
-		if (!strcmp(name, attrs[i]->name))
-			attr_store(dev, attrs[i], buf, size);
-	}
-
-	return 0;
-}
-
-static int groups_store_iter(struct device *dev,
-	const char *name, const char *buf, size_t size, const struct attribute_group **groups)
-{
-	int i;
-
-	for (i = 0; groups[i]; i++)
-		attrs_store_iter(dev, name, buf, size, groups[i]->attrs);
-
-	return 0;
-}
-
-static int dev_attrs_store_iter(struct device *dev,
-	const char *name, const char *buf, size_t size, struct device_attribute *dev_attrs)
-{
-	int i;
-
-	for (i = 0; attr_name(dev_attrs[i]); i++) {
-		if (!strcmp(name, attr_name(dev_attrs[i])))
-			attr_store(dev, &dev_attrs[i].attr, buf, size);
-	}
-
-	return 0;
-}
-
-static int attr_find_and_store(struct device *dev,
-	const char *name, const char *buf, size_t size)
-{
-	struct device_attribute *dev_attrs;
-	const struct attribute_group **groups;
-
-	if (dev->class && dev->class->dev_attrs) {
-		dev_attrs = dev->class->dev_attrs;
-		dev_attrs_store_iter(dev, name, buf, size, dev_attrs);
-	}
-
-	if (dev->type && dev->type->groups) {
-		groups = dev->type->groups;
-		groups_store_iter(dev, name, buf, size, groups);
-	}
-
-	if (dev->groups) {
-		groups = dev->groups;
-		groups_store_iter(dev, name, buf, size, groups);
-	}
-
-	return 0;
-}
-
-ssize_t attr_store_for_each(struct class *cls,
-	const char *name, const char *buf, size_t size)
-{
-	struct class_dev_iter iter;
-	struct device *dev;
-	int error = 0;
-	struct class *class = cls;
-
-	if (!class)
-		return -EINVAL;
-	if (!class->p) {
-		WARN(1, "%s called for class '%s' before it was initialized",
-		     __func__, class->name);
-		return -EINVAL;
-	}
-
-	class_dev_iter_init(&iter, class, NULL, NULL);
-	while ((dev = class_dev_iter_next(&iter))) {
-		error = attr_find_and_store(dev, name, buf, size);
-		if (error)
-			break;
-	}
-	class_dev_iter_exit(&iter);
-
-	return error;
-}
-
-struct class *get_mdnie_class(void)
-{
-	return mdnie_class;
 }
 

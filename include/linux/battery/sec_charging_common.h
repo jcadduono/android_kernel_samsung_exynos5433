@@ -32,10 +32,6 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 
-#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
-#include <linux/sec_batt_selfdchg_common.h>
-#endif
-
 /* definitions */
 #define	SEC_SIZEOF_POWER_SUPPLY_TYPE	POWER_SUPPLY_TYPE_WIRELESS_REMOVE
 
@@ -85,9 +81,7 @@ enum sec_battery_adc_channel {
 	SEC_BAT_ADC_CHANNEL_NUM,
 	SEC_BAT_ADC_CHANNEL_CHG_TEMP,
 	SEC_BAT_ADC_CHANNEL_INBAT_VOLTAGE,
-#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
 	SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK,
-#endif
 };
 
 /* charging mode */
@@ -479,10 +473,15 @@ struct sec_battery_platform_data {
 	unsigned int swelling_block_time;
 #endif
 
-#ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
+#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
 	/* self discharging */
-	char *sdchg_type;
-	struct sdchg_info_t *sdchg_info;
+	bool self_discharging_en;
+	unsigned int discharging_adc_max;
+	unsigned int discharging_adc_min;
+	unsigned int self_discharging_voltage_limit;
+	int force_discharging_limit;
+	int force_discharging_recov;
+	int factory_discharging;
 #endif
 
 	/* Monitor setting */

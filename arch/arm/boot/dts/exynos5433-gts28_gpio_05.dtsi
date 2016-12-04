@@ -207,8 +207,7 @@
 		PIN_IN(gpc3-6, NONE, LV1);	/* HW_REV(2) */
 		PIN_IN(gpc3-7, NONE, LV1);	/* HW_REV(3) */
 
-		PIN_IN(gpd4-1, NONE, LV1);	/* PS_ALS_I2C_SDA */
-		PIN_IN(gpd4-2, NONE, LV1);	/* PS_ALS_I2C_SCL */
+		PIN_IN(gpd4-1, DOWN, LV1);	/* NC */
 		PIN_OUT_SET(gpg3-5, 0, LV1);	/* UART_SW_CTL */
 
 		PIN_IN(gpd8-0, DOWN, LV1);	/* NC */

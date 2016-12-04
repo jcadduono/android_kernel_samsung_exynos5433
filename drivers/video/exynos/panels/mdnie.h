@@ -1,6 +1,8 @@
 #ifndef __MDNIE_H__
 #define __MDNIE_H__
 
+#define MDNIE_LITE
+
 typedef u8 mdnie_t;
 
 enum MODE {
@@ -63,6 +65,16 @@ enum hmt_mode {
 	HMT_MDNIE_MAX,
 };
 
+#if 0
+enum MDNIE_CMD {
+	LEVEL_KEY_UNLOCK,
+	MDNIE_CMD1,
+	MDNIE_CMD2,
+	LEVEL_KEY_LOCK,
+	MDNIE_CMD_MAX,
+};
+#endif
+
 struct mdnie_seq_info {
 	mdnie_t *cmd;
 	unsigned int len;
@@ -103,7 +115,6 @@ struct mdnie_ops {
 
 typedef int (*mdnie_w)(void *devdata, struct mdnie_seq_info *seq, u32 len);
 typedef int (*mdnie_r)(void *devdata, u8 addr, u8 *buf, u32 len);
-
 
 struct mdnie_info {
 	struct clk		*bus_clk;
@@ -150,7 +161,5 @@ extern int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r, st
 extern int mdnie2_register(struct device *p, void *data, mdnie_w w, mdnie_r r);
 #endif
 extern uintptr_t mdnie_request_table(char *path, struct mdnie_table *s);
-extern ssize_t attr_store_for_each(struct class *cls, const char *name, const char *buf, size_t size);
-extern struct class *get_mdnie_class(void);
 
 #endif /* __MDNIE_H__ */

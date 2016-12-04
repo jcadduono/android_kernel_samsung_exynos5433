@@ -192,6 +192,15 @@ enum mfc_buf_usage_type {
 	MFCBUF_DRM,
 };
 
+enum mfc_buf_process_type {
+	MFCBUFPROC_DEFAULT 		= 0x0,
+	MFCBUFPROC_COPY 		= (1 << 0),
+	MFCBUFPROC_SHARE 		= (1 << 1),
+	MFCBUFPROC_META 		= (1 << 2),
+	MFCBUFPROC_ANBSHARE		= (1 << 3),
+	MFCBUFPROC_ANBSHARE_NV12L	= (1 << 4),
+};
+
 struct s5p_mfc_ctx;
 struct s5p_mfc_extra_buf;
 struct s5p_mfc_dev;
@@ -870,7 +879,6 @@ struct s5p_mfc_ctx {
 	struct list_head qos_list;
 #endif
 	int qos_ratio;
-	int qos_changed;
 	int framerate;
 	int last_framerate;
 	int avg_framerate;
@@ -880,7 +888,7 @@ struct s5p_mfc_ctx {
 	int qp_max_change;
 
 	int is_max_fps;
-	int use_extra_qos;
+	int buf_process_type;
 
 	struct mfc_timestamp ts_array[MFC_TIME_INDEX];
 	struct list_head ts_list;
@@ -1093,9 +1101,6 @@ int s5p_mfc_dec_ctx_ready(struct s5p_mfc_ctx *ctx);
 int s5p_mfc_enc_ctx_ready(struct s5p_mfc_ctx *ctx);
 int s5p_mfc_request_sec_pgtable(struct s5p_mfc_dev *dev);
 int s5p_mfc_release_sec_pgtable(struct s5p_mfc_dev *dev);
-#if defined(CONFIG_SOC_EXYNOS5433)
-int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev);
-#endif
 
 static inline int s5p_mfc_ctx_ready(struct s5p_mfc_ctx *ctx)
 {

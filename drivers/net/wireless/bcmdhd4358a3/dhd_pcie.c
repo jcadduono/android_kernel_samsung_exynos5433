@@ -1,7 +1,7 @@
 /*
  * DHD Bus Module for PCIE
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -3472,8 +3472,7 @@ dhdpcie_bus_suspend(struct dhd_bus *bus, bool state)
 				/* Read the Mb data to see if the Dongle has actually sent D3 ACK */
 				dhd_bus_cmn_readshared(bus, &d2h_mb_data, DTOH_MB_DATA, 0);
 
-				if (!D2H_DEV_MB_INVALIDATED(d2h_mb_data) &&
-					(d2h_mb_data & D2H_DEV_D3_ACK)) {
+				if (d2h_mb_data & D2H_DEV_D3_ACK) {
 					DHD_ERROR(("*** D3 WAR for missing interrupt ***\r\n"));
 					/* Clear the MB Data */
 					dhd_bus_cmn_writeshared(bus, &zero, sizeof(uint32),

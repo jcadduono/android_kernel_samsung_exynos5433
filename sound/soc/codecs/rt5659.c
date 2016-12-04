@@ -32,12 +32,12 @@
 
 #include "rt5659.h"
 
+#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL_RT5659
 static struct snd_soc_codec *registered_codec;
+#endif
 
 static struct class *codec_efs_class;
 static struct device *codec_efs_dev;
-
-u8 efs_mount_done = 0;
 
 /* Delay(ms) after powering on DMIC for avoiding pop */
 static int dmic_power_delay = 450;
@@ -73,8 +73,6 @@ static struct reg_default init_list[] = {
 	{RT5659_4BTN_IL_CMD_1,		0x000b},
 	{RT5659_MONO_DRE_CTRL_2, 	0x003a},
 	{RT5659_DUMMY_2, 		0x001d},
-	{RT5659_STO_DRE_CTRL_2, 	0x0041},
-	{RT5659_STO_DRE_CTRL_3, 	0x040c},	
 };
 #define RT5659_INIT_REG_LEN ARRAY_SIZE(init_list)
 
@@ -4976,7 +4974,6 @@ static ssize_t rt5659_codec_efs_store(struct device *dev,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct rt5659_priv *rt5659 = i2c_get_clientdata(client);
 
-	efs_mount_done = 1;
 	wake_up_interruptible(&rt5659->waitqueue_cal);
 
 	return count;
@@ -5048,26 +5045,6 @@ void rt5659_dynamic_control_micbias(int micb_out_val)
 }
 #endif
 
-void rt5659_micbias1_output(int on)
-{
-	if (on) {
-		snd_soc_update_bits(registered_codec, RT5659_PWR_ANLG_1,
-			RT5659_PWR_MB | RT5659_PWR_VREF1 | RT5659_PWR_VREF2,
-			RT5659_PWR_MB | RT5659_PWR_VREF1 | RT5659_PWR_VREF2);
-		snd_soc_update_bits(registered_codec, RT5659_PWR_ANLG_2,
-			RT5659_PWR_MB1, RT5659_PWR_MB1);
-	} else {
-		snd_soc_update_bits(registered_codec, RT5659_PWR_ANLG_2,
-			RT5659_PWR_MB1, 0);
-
-		if (registered_codec->dapm.bias_level == SND_SOC_BIAS_OFF)
-			snd_soc_update_bits(registered_codec, RT5659_PWR_ANLG_1,
-				RT5659_PWR_MB | RT5659_PWR_VREF1 |
-				RT5659_PWR_VREF2 | RT5659_PWR_FV1 |
-				RT5659_PWR_FV2, 0);
-	}
-}
-
 static int rt5659_reg_init(struct snd_soc_codec *codec)
 {
 	struct rt5659_priv *rt5659 = snd_soc_codec_get_drvdata(codec);
@@ -5087,7 +5064,9 @@ static int rt5659_probe(struct snd_soc_codec *codec)
 	pr_debug("%s\n", __func__);
 
 	rt5659->codec = codec;
+#ifdef CONFIG_DYNAMIC_MICBIAS_CONTROL_RT5659
 	registered_codec = codec;
+#endif
 
 	rt5659_reg_init(codec);
 	rt5659_set_bias_level(codec, SND_SOC_BIAS_OFF);
@@ -5634,9 +5613,26 @@ int rt5659_cal_data_read_efs(struct rt5659_cal_data *cal_data)
 
 int rt5659_check_efs_mounted(void)
 {
-	pr_info("%s : efs_mount_done - %d\n", __func__, efs_mount_done);
+	struct file *fp = NULL;
+	mm_segment_t oldfs = {0};
+	int ret = 0;
 
-	return efs_mount_done;
+	oldfs = get_fs();
+	set_fs(get_ds());
+
+	fp = filp_open("/efs/", O_RDONLY, 0);
+
+	if (IS_ERR(fp)) {
+		pr_err("%s : efs is not mount yet\n", __func__);
+		ret = false;
+	} else {
+		pr_info("%s : efs is mounted\n", __func__);
+		filp_close(fp, NULL);
+		ret = true;
+	}
+
+	set_fs(oldfs);
+	return ret;
 }
 
 static void rt5659_calibrate_handler(struct work_struct *work)

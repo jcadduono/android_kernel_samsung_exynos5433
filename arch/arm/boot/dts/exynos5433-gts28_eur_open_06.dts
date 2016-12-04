@@ -22,7 +22,7 @@
 	model_info-platform = "gts28";
 	model_info-subtype = "gts28_eur_open";
 	model_info-hw_rev = <6>;
-	model_info-hw_rev_end = <8>;
+	model_info-hw_rev_end = <255>;
 	compatible = "samsung,GTS2 8 LTE 06", "samsung,exynos5433";
 
 	i2c@25 {

@@ -3463,30 +3463,6 @@ dhdpcie_bus_suspend(struct dhd_bus *bus, bool state)
 		dhd_os_set_ioctl_resp_timeout(IOCTL_RESP_TIMEOUT);
 		DHD_OS_WAKE_LOCK_RESTORE(bus->dhd);
 
-		{
-			uint32 d2h_mb_data = 0;
-			uint32 zero = 0;
-
-			/* If wait_for_d3_ack was not updated because D2H MB was not received */
-			if (bus->wait_for_d3_ack == 0) {
-				/* Read the Mb data to see if the Dongle has actually sent D3 ACK */
-				dhd_bus_cmn_readshared(bus, &d2h_mb_data, DTOH_MB_DATA, 0);
-
-				if (!D2H_DEV_MB_INVALIDATED(d2h_mb_data) &&
-					(d2h_mb_data & D2H_DEV_D3_ACK)) {
-					DHD_ERROR(("*** D3 WAR for missing interrupt ***\r\n"));
-					/* Clear the MB Data */
-					dhd_bus_cmn_writeshared(bus, &zero, sizeof(uint32),
-						DTOH_MB_DATA, 0);
-
-					/* Consider that D3 ACK is received */
-					bus->wait_for_d3_ack = 1;
-					bus->d3_ack_war_cnt++;
-
-				} /* d2h_mb_data & D2H_DEV_D3_ACK */
-			} /* bus->wait_for_d3_ack was 0 */
-		}
-
 		/* To allow threads that got pre-empted to complete.
 		*/
 		while ((active = dhd_os_check_wakelock_all(bus->dhd)) &&

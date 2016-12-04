@@ -507,24 +507,18 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 {
 	int retval;
 	unsigned char retry;
-	unsigned char buf[length + 1];
 	unsigned char buf_page[PAGE_SELECT_LEN];
 	unsigned char page;
 
-	struct i2c_msg msg[] = {
-		{
-			.addr = rmi4_data->i2c_client->addr,
-			.flags = 0,
-			.len = PAGE_SELECT_LEN,
-			.buf = buf_page,
-		},
-		{
-			.addr = rmi4_data->i2c_client->addr,
-			.flags = 0,
-			.len = length + 1,
-			.buf = buf,
-		}
-	};
+	struct i2c_msg msg[2];
+	unsigned char *buf;
+	buf = kzalloc(length + 1, GFP_KERNEL);
+	if (!buf) {
+		dev_err(&rmi4_data->i2c_client->dev, 
+			"%s: Failed to alloc mem for buffer\n",
+			__func__);
+		return -ENOMEM;
+	}
 
 	page = ((addr >> 8) & MASK_8BIT);
 	buf_page[0] = MASK_8BIT;
@@ -538,6 +532,15 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 		retval = 0;
 		goto exit;
 	}
+
+	msg[0].addr = rmi4_data->i2c_client->addr;
+	msg[0].flags = 0;
+	msg[0].len = PAGE_SELECT_LEN;
+	msg[0].buf = buf_page;
+	msg[1].addr = rmi4_data->i2c_client->addr;
+	msg[1].flags = 0;
+	msg[1].len = length + 1;
+	msg[1].buf = buf;
 
 	buf[0] = addr & MASK_8BIT;
 	memcpy(&buf[1], &data[0], length);
@@ -562,6 +565,7 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 
 exit:
 	mutex_unlock(&(rmi4_data->rmi4_io_ctrl_mutex));
+	kfree(buf);
 
 	return retval;
 }
@@ -699,9 +703,6 @@ static void synaptics_rmi4_release_all_finger(struct synaptics_rmi4_data *rmi4_d
 			rmi4_data->finger[ii].print_type = TOUCH_RELEASE_FORCED;
 #ifdef EDGE_SWIPE
 			input_report_abs(rmi4_data->input_dev, ABS_MT_PALM, 0);
-#endif
-#ifdef TSP_SUPPROT_MULTIMEDIA
-			input_report_abs(rmi4_data->input_dev,ABS_MT_PRESSURE, 0);
 #endif
 		}
 		input_mt_report_slot_state(rmi4_data->input_dev, MT_TOOL_FINGER, 0);
@@ -894,7 +895,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	int wx;
 	int wy;
 	int x_y_tmp;
-#if defined(TSP_SUPPROT_MULTIMEDIA) || defined(REPORT_2D_Z)
+#ifdef REPORT_2D_Z
 	int z = 0;
 #endif
 	struct synaptics_rmi4_f12_extra_data *extra_data;
@@ -988,10 +989,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 		}
 #endif
 		input_mt_slot(rmi4_data->input_dev, finger);
-#ifdef TSP_SUPPROT_MULTIMEDIA
-		if (!finger_status)
-			input_report_abs(rmi4_data->input_dev,ABS_MT_PRESSURE, 0);
-#endif
 		input_mt_report_slot_state(rmi4_data->input_dev, tool_type, finger_status ? true : false);
 
 		rmi4_data->finger[finger].tool_type = tool_type;
@@ -1015,7 +1012,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			wx = finger_data->wx;
 			wy = finger_data->wy;
 #endif
-#if defined(TSP_SUPPROT_MULTIMEDIA) ||defined(REPORT_2D_Z)
+#ifdef REPORT_2D_Z
 			z = finger_data->z;
 #endif
 
@@ -1054,12 +1051,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #ifdef REPORT_2D_Z
 			rmi4_data->finger[finger].z = z;
 #endif
-#ifdef TSP_SUPPROT_MULTIMEDIA
-			if (!(rmi4_data->use_velocity||rmi4_data->use_brush)) {
-				z = (z > 0) ? 255 : 0;
-			}
-			rmi4_data->finger[finger].z = z;
-#endif
 
 			input_report_key(rmi4_data->input_dev,
 					BTN_TOUCH, finger_status == OBJECT_HOVER ? 0 : 1);
@@ -1074,7 +1065,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					ABS_MT_TOUCH_MAJOR, max(wx, wy));
 			input_report_abs(rmi4_data->input_dev,
 					ABS_MT_TOUCH_MINOR, min(wx, wy));
-#if defined(TSP_SUPPROT_MULTIMEDIA) || defined(REPORT_2D_Z)
+#ifdef REPORT_2D_Z
 			input_report_abs(rmi4_data->input_dev,
 					ABS_MT_PRESSURE, z);
 #endif
@@ -1993,10 +1984,13 @@ static int synaptics_rmi4_f12_init(struct synaptics_rmi4_data *rmi4_data,
 #endif
 	rmi4_data->f12.report_enable = RPT_DEFAULT;
 //	rmi4_data->f12.obj_report_enable = OBJ_TYPE_DEFAULT; /* depend on models */
+#ifdef REPORT_2D_Z
+	rmi4_data->f12.report_enable |= RPT_Z;
+#endif
 #ifdef REPORT_2D_W
 	rmi4_data->f12.report_enable |= (RPT_WX | RPT_WY);
 #endif
-#if defined(TSP_SUPPROT_MULTIMEDIA) || defined(REPORT_2D_Z)
+#ifdef REPORT_2D_Z
 	rmi4_data->f12.report_enable |= RPT_Z;
 #endif
 
@@ -2654,55 +2648,6 @@ static int synaptics_rmi4_check_status(struct synaptics_rmi4_data *rmi4_data)
 	return 0;
 }
 
-#ifdef TSP_SUPPROT_MULTIMEDIA
-static void synaptics_rmi4_mode_reinit(struct synaptics_rmi4_data *rmi4_data)
-{
-	int retval;
-	unsigned char boost_up_en = 0;
-	unsigned char old_boost_up_en = 0;
-
-    retval = rmi4_data->i2c_read(rmi4_data,
-                rmi4_data->f51->general_control_addr, &boost_up_en, sizeof(boost_up_en));
-    
-    if (retval < 0) {
-		tsp_debug_err(true, &(rmi4_data->i2c_client->dev),
-			"%s: Failed to synaptics_rmi4_set_boost_up\n", __func__);
-	}
-	old_boost_up_en = boost_up_en;
-
-#ifdef MM_MODE_CHANGE
-	/* 0: Default   , 1: Enable Boost Up 1phi */
-	if (rmi4_data->use_velocity || rmi4_data->use_brush)
-		boost_up_en |= BOOST_UP_EN;
-	else
-		boost_up_en &= ~(BOOST_UP_EN);
-#else
-	/* 0: Default	, 1: Enable Boost Up 1phi */
-	if (rmi4_data->use_brush)
-		boost_up_en |= BOOST_UP_EN;
-	else
-		boost_up_en &= ~(BOOST_UP_EN);
-#endif
-
-	if (old_boost_up_en != boost_up_en) {
-		retval = rmi4_data->i2c_write(rmi4_data,
-			rmi4_data->f51->general_control_addr,
-			&boost_up_en, sizeof(boost_up_en));
-
-		if (retval < 0) {
-			tsp_debug_err(true, &(rmi4_data->i2c_client->dev),
-				"%s: Failed to synaptics_rmi4_set_boost_up\n",__func__);
-		}
-	}
-
-	tsp_debug_info(true, &rmi4_data->i2c_client->dev,
-		"%s : After_LockScreen_reinit[%x][%x]\n",
-		__func__, old_boost_up_en, boost_up_en);
-    
-	return;
-}
-#endif
-
 static void synaptics_rmi4_set_configured(struct synaptics_rmi4_data *rmi4_data)
 {
 	int retval;
@@ -3231,7 +3176,7 @@ static int synaptics_rmi4_set_input_device(struct synaptics_rmi4_data *rmi4_data
 			ABS_MT_TOUCH_MINOR, 0,
 			rmi4_data->max_touch_width, 0, 0);
 #endif
-#if defined(TSP_SUPPROT_MULTIMEDIA) || defined(REPORT_2D_Z)
+#ifdef REPORT_2D_Z
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_PRESSURE, 0,
 			DSX_PRESSURE_MAX, 0, 0);
@@ -3373,10 +3318,6 @@ static int synaptics_rmi4_reinit_device(struct synaptics_rmi4_data *rmi4_data)
 	}
 
 	synaptics_rmi4_set_configured(rmi4_data);
-#ifdef TSP_SUPPROT_MULTIMEDIA
-// Mode off when Lock Screen so mode enable again when reinit.
-    	synaptics_rmi4_mode_reinit(rmi4_data);
-#endif
 
 exit:
 	mutex_unlock(&(rmi4_data->rmi4_reset_mutex));
