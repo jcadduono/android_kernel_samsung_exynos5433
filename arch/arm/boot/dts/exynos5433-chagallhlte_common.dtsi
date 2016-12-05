@@ -27,7 +27,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttySAC1,115200 vmalloc=256M";
+		bootargs = "console=ttySAC1,115200 vmalloc=256M androidboot.hardware=universal5433 androidboot.bootdevice=15540000.dwmmc0 androidboot.selinux=permissive";
 	};
 
 	fixed-rate-clocks {
